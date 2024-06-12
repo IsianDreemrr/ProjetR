@@ -3,6 +3,13 @@
 ```{r}
 install.packages("shiny")
 ```
+```{r}
+install.packages("DBI")
+install.packages("RMySQL")
+```
+```{r}
+install.packages("ggplot2")
+```
 
 ```{r}
 library(shiny)
