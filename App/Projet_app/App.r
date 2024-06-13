@@ -4,6 +4,14 @@ library(bslib)
 library(DBI)
 library(RMySQL)
 library(ggplot2)
+library(DT)
+
+theme <- bs_theme(
+  bg = "#0b3d91", fg = "white", primary = "#FCC780",
+  base_font = font_google("Space Mono"),
+  code_font = font_google("Space Mono")
+)
+
 
 cn <- dbConnect(drv      = RMySQL::MySQL(), 
                 username = "ipssi", 
@@ -16,7 +24,10 @@ cn <- dbConnect(drv      = RMySQL::MySQL(),
 df <- dbReadTable(cn, 'data_brut')#reads as a data.frame
 
 
-
+  # Close the database connection when the app stops
+  onStop(function() {
+    dbDisconnect(con)
+  })
 
 
 
@@ -75,28 +86,30 @@ df <- dbReadTable(cn, 'data_brut')#reads as a data.frame
 
 ui <- shinyUI(
   navbarPage("Projet R - Immobilier",
+  theme = bs_theme(),
       tabPanel("Accueil"),
              
       tabPanel("Jeu de données",
+      
                 fluidPage(
-                titlePanel("Table de données - Offres immobilières"),
-                mainPanel(tableOutput("db_table")))
-                ),
+                titlePanel("Table de données - Offres immobilières"),  
+                sidebarLayout(sidebarPanel(
+                    selectInput("filter_col", "Filter by column", choices = names(df)),
+                    textInput("filter_value", "Filter value")
+                  ),
+                mainPanel(
+                  tableOutput("db_table")
+                )))),
 
       tabPanel("Analyse",
                 fluidPage(
                 titlePanel("Répartition des prix"),
                     sidebarLayout(sidebarPanel(
-                        selectInput("price", "X-axis variable", ""),
-                        selectInput("sqft_lot", "Y-axis variable", "")
+                        # selectInput("price", "X-axis variable", ""),
+                        selectInput("comparaison", "Variable Y", "")
                       ),
                       mainPanel(
-                          plotOutput("plot1",
-    click = "plot_click",
-    dblclick = "plot_dblclick",
-    hover = "plot_hover",
-    brush = "plot_brush"
-  ),
+                          plotOutput("scatterPlot"),
                       )
                     )
                   )
@@ -118,27 +131,40 @@ server <- function(input, output, session) {
 
   # Update the UI with column names for selection
   observe({
-    updateSelectInput(session, "price", choices = names(data))
-    updateSelectInput(session, "sqft_lot", choices = names(data))
+    updateSelectInput(session, "filter_col", choices = names(df))
+    # updateSelectInput(session, "price", choices = names(df))
+    updateSelectInput(session, "comparaison", choices = names(df))
   })
   
-  # Render the plot
-  output$plot <- renderPlot({
-    x <- input$xcol
-    y <- input$ycol
-    
-    if (is.null(x) || is.null(y)) return(NULL)
-    
-    ggplot(data, aes_string(x = x, y = y)) +
+  output$scatterPlot <- renderPlot({
+    ycol <- input$comparaison
+    if (is.null(ycol)) return(NULL)
+
+    ggplot(df, aes(x = df[[ycol]], y = price)) +
       geom_point() +
       theme_minimal() +
-      labs(x = x, y = y)
+      labs(
+        title = paste("Prix selon ",ycol),
+        x = ycol,
+        y = "Prix"
+      )
   })
 
-  # Close the database connection when the app stops
-  # onStop(function() {
-  #   dbDisconnect(con)
-  # })
+    # Render the data table with optional filtering
+  output$table <- renderDT({
+    req(input$filter_col, input$filter_value)
+    filtered_data <- data
+    
+    if (input$filter_value != "") {
+      filter_col <- input$filter_col
+      filter_value <- input$filter_value
+      filtered_data <- filtered_data[grepl(filter_value, filtered_data[[filter_col]], ignore.case = TRUE), ]
+    }
+    
+    datatable(filtered_data, options = list(pageLength = 10))
+  })
+
+
 }
 
 
