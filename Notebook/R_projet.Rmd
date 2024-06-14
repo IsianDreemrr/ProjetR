@@ -1,0 +1,320 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# Analyse Langage R : House Data
+
+Notre objectif est d'estimer le prix d'un bien immobilier en Amérique, plus précisement dans le département 98. Pour cela nous avons différentes colonnes :
+
+```{r}
+names(Cleaned_Dataset_House_data)
+```
+
+```{r}
+install.packages("ggplot2")
+library(ggplot2)
+
+head(Cleaned_Dataset_House_data)
+```
+
+Interressons nous maintenant aux données.
+
+```{r}
+install.packages("dplyr")
+library(dplyr)
+
+# Nombre d'observations et de variables
+num_observations <- nrow(Cleaned_Dataset_House_data)
+num_variables <- ncol(Cleaned_Dataset_House_data)
+ 
+# Résumé numérique des variables
+summary_stats <- Cleaned_Dataset_House_data %>%
+  select_if(is.numeric) %>%
+  summarise_all(list(
+    min = ~min(.),
+    max = ~max(.),
+    mean = ~mean(.),
+    median = ~median(.),
+    var = ~var(.),
+    sd = ~sd(.)
+  ))
+ 
+# Afficher le nombre d'observations, le nombre de variables et les statistiques résumées
+cat("Nombre d'observations: ", num_observations, "\n")
+cat("Nombre de variables: ", num_variables, "\n")
+print(summary_stats)
+```
+
+```{r}
+summary(Cleaned_Dataset_House_data)
+str(Cleaned_Dataset_House_data)
+
+```
+
+Ici nous allons nous intérresser à la répartition des prix moyens des maisons par régions
+
+```{r}
+#repartition des prix moyens des maisons par régions 
+# Charger les bibliothèques nécessaires
+library(ggplot2)
+library(dplyr)
+ 
+
+ 
+# Calculer les prix moyens par région
+price_by_region <- Cleaned_Dataset_House_data %>% 
+  group_by(zipcode) %>%
+  summarise(mean_price = mean(price, na.rm = TRUE),
+            count = n()) %>%
+  arrange(desc(mean_price))
+ 
+# Afficher les résultats
+print(price_by_region)
+ 
+# Visualiser les prix moyens par région
+ggplot(price_by_region, aes(x = reorder(zipcode, -mean_price), y = mean_price)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  labs(title = "Mean House Prices by Region", x = "Region", y = "Mean Price")
+ 
+# Répartition des effectifs par région
+count_by_region <- Cleaned_Dataset_House_data %>% 
+  group_by(zipcode) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count))
+ 
+# Afficher les résultats
+print(count_by_region)
+ 
+# Visualiser la répartition des effectifs par région
+ggplot(count_by_region, aes(x = reorder(zipcode, -count), y = count)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  labs(title = "House Count by Region", x = "Region", y = "Count")
+
+```
+
+On se demande ici, si le nombre de chambre dépend-il de la région, pour cela nous allons effectuer un test de chi2 si la p-value est inférieur à 0,05 alors le nombre de chambre peut dépendre de la région.
+
+```{r}
+# Au risque de 5% est ce que le nombre de chambre dépend-il de la région ?
+
+
+library(dplyr)
+
+
+
+
+Cleaned_Dataset_House_data$region <- as.factor(Cleaned_Dataset_House_data$zipcode)
+
+Cleaned_Dataset_House_data$bedrooms <- as.factor(Cleaned_Dataset_House_data$bedrooms)
+ 
+# Créer une table de contingence
+
+contingency_table <- table(Cleaned_Dataset_House_data$zipcode, Cleaned_Dataset_House_data$bedrooms)
+ 
+# Effectuer le test du chi-carré
+
+chi_test <- chisq.test(contingency_table)
+ 
+# Afficher les résultats du test du chi-carré
+
+print(chi_test)
+ 
+# Interpréter les résultats
+
+if (chi_test$p.value < 0.05) {
+
+  print("Il existe une différence significative dans la répartition du nombre de chambres entre les régions (p < 0.05).")
+
+} else {
+
+  print("Il n'existe pas de différence significative dans la répartition du nombre de chambres entre les régions (p >= 0.05).")
+
+}
+
+```
+
+```{r}
+# Convertir les colonnes pertinentes en numériques
+Cleaned_Dataset_House_data$price <- as.numeric(Cleaned_Dataset_House_data$price)
+Cleaned_Dataset_House_data$sqft_living <- as.numeric(Cleaned_Dataset_House_data$sqft_living)
+ 
+# Construire le modèle de régression linéaire
+model <- lm(price ~ sqft_living, data = Cleaned_Dataset_House_data)
+ 
+# Résumé du modèle
+summary_model <- summary(model)
+print(summary_model)
+ 
+# Interpréter les résultats
+p_value <- summary_model$coefficients[2, 4] # p-value du coefficient de sqft_living
+ 
+if (p_value < 0.05) {
+  print("Le prix de la maison dépend significativement de la surface en m² (p < 0.05).")
+} else {
+  print("Le prix de la maison ne dépend pas significativement de la surface en m² (p >= 0.05).")
+}
+```
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+
+
+# Sélectionner les variables numériques
+numeric_vars <- Cleaned_Dataset_House_data %>% select_if(is.numeric)
+ 
+# Calculer la matrice de corrélation
+cor_matrix <- cor(numeric_vars, use = "complete.obs")
+ 
+# Afficher la matrice de corrélation
+print(cor_matrix)
+ 
+# Convertir la matrice de corrélation en format long pour ggplot2
+melted_cor_matrix <- as.data.frame(as.table(cor_matrix))
+ 
+# Visualiser la matrice de corrélation avec ggplot2
+ggplot(data = melted_cor_matrix, aes(x = Var1, y = Var2, fill = Freq)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", midpoint = 0, limit = c(-1, 1), space = "Lab", name="Correlation") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, size = 12, hjust = 1)) +
+  coord_fixed() +
+  labs(title = "Correlation Matrix", x = "", y = "")
+```
+
+```{r}
+# Convertir les colonnes pertinentes en facteurs si nécessaire
+data$zipcode <- as.factor(data$zipcode)
+data$waterfront <- as.factor(data$waterfront)
+data$view <- as.factor(data$view)
+data$condition <- as.factor(data$condition)
+data$grade <- as.factor(data$grade)
+ 
+# Exemple : Test du chi-carré entre 'zipcode' et 'waterfront'
+contingency_table_1 <- table(data$zipcode, data$waterfront)
+chi_test_1 <- chisq.test(contingency_table_1)
+print(chi_test_1)
+ 
+# Exemple : Test du chi-carré entre 'zipcode' et 'view'
+contingency_table_2 <- table(data$zipcode, data$view)
+chi_test_2 <- chisq.test(contingency_table_2)
+print(chi_test_2)
+ 
+# Exemple : Test du chi-carré entre 'zipcode' et 'condition'
+contingency_table_3 <- table(data$zipcode, data$condition)
+chi_test_3 <- chisq.test(contingency_table_3)
+print(chi_test_3)
+
+```
+
+```{r}
+# Convertir les colonnes pertinentes en facteurs si nécessaire
+Cleaned_Dataset_House_data$zipcode <- as.factor(Cleaned_Dataset_House_data$zipcode)
+Cleaned_Dataset_House_data$waterfront <- as.factor(Cleaned_Dataset_House_data$waterfront)
+Cleaned_Dataset_House_data$view <- as.factor(Cleaned_Dataset_House_data$view)
+Cleaned_Dataset_House_data$condition <- as.factor(Cleaned_Dataset_House_data$condition)
+Cleaned_Dataset_House_data$grade <- as.factor(Cleaned_Dataset_House_data$grade)
+ 
+# Exemple : Test du chi-carré entre 'zipcode' et 'waterfront'
+contingency_table_1 <- table(Cleaned_Dataset_House_data$zipcode, Cleaned_Dataset_House_data$waterfront)
+chi_test_1 <- chisq.test(contingency_table_1)
+print(chi_test_1)
+ 
+# Exemple : Test du chi-carré entre 'zipcode' et 'view'
+contingency_table_2 <- table(Cleaned_Dataset_House_data$zipcode, Cleaned_Dataset_House_data$view)
+chi_test_2 <- chisq.test(contingency_table_2)
+print(chi_test_2)
+ 
+# Exemple : Test du chi-carré entre 'zipcode' et 'condition'
+contingency_table_3 <- table(Cleaned_Dataset_House_data$zipcode, Cleaned_Dataset_House_data$condition)
+chi_test_3 <- chisq.test(contingency_table_3)
+print(chi_test_3)
+```
+
+```{r}
+# Sélectionner les variables pertinentes pour la régression
+regression_data <- Cleaned_Dataset_House_data %>% 
+  select(price, bedrooms, bathrooms, sqft_living, sqft_lot, floors, waterfront, view, condition, grade, sqft_above, sqft_basement, yr_built, yr_renovated, lat, long, sqft_living15, sqft_lot15)
+ 
+# Afficher un aperçu des données sélectionnées
+print(head(regression_data))
+# Diviser les données en ensemble d'entraînement et de test
+set.seed(123)  # Pour assurer la reproductibilité
+train_index <- sample(seq_len(nrow(regression_data)), size = 0.8 * nrow(regression_data))
+train_data <- regression_data[train_index, ]
+test_data <- regression_data[-train_index, ]
+# Construire le modèle de régression linéaire# Prédire sur les données de test
+predictions <- predict(model, newdata = test_data)
+ 
+# Calculer la racine carrée de l'erreur quadratique moyenne (RMSE)
+rmse <- sqrt(mean((predictions - test_data$price)^2))
+print(paste("RMSE: ", rmse))
+ 
+# Visualiser les prédictions vs valeurs réelles
+ggplot() +
+  geom_point(aes(x = test_data$price, y = predictions)) +
+  geom_abline(slope = 1, intercept = 0, color = "red") +
+  labs(title = "Predicted vs Actual Prices", x = "Actual Prices", y = "Predicted Prices")
+model <- lm(price ~ ., data = train_data)
+ 
+# Résumé du modèle
+print(summary(model))
+
+# Afficher la taille des ensembles d'entraînement et de test
+print(dim(train_data))
+print(dim(test_data))
+```
+
+```{r}
+# Sélectionner les variables pertinentes pour la régression
+regression_data <- Cleaned_Dataset_House_data %>% 
+  select(price, bedrooms, bathrooms, sqft_living, sqft_lot, floors, waterfront, view, condition, grade, sqft_above, sqft_basement, yr_built, yr_renovated, lat, long, sqft_living15, sqft_lot15)
+ 
+# Convertir les colonnes catégorielles en facteurs
+regression_data$waterfront <- as.factor(regression_data$waterfront)
+regression_data$view <- as.factor(regression_data$view)
+regression_data$condition <- as.factor(regression_data$condition)
+regression_data$grade <- as.factor(regression_data$grade)
+ 
+# Diviser les données en ensemble d'entraînement et de test
+set.seed(123)  # Pour assurer la reproductibilité
+train_index <- sample(seq_len(nrow(regression_data)), size = 0.8 * nrow(regression_data))
+train_data <- regression_data[train_index, ]
+test_data <- regression_data[-train_index, ]
+ 
+# Assurer que les facteurs ont les mêmes niveaux dans les ensembles d'entraînement et de test
+factor_vars <- c("waterfront", "view", "condition", "grade")
+for (var in factor_vars) {
+  train_data[[var]] <- factor(train_data[[var]])
+  test_data[[var]] <- factor(test_data[[var]], levels = levels(train_data[[var]]))
+}
+ 
+# Construire le modèle de régression linéaire multiple
+model <- lm(price ~ bedrooms + bathrooms + sqft_living + sqft_lot + floors + waterfront + view + condition + grade + sqft_above + sqft_basement + yr_built + yr_renovated + lat + long + sqft_living15 + sqft_lot15, data = train_data)
+ 
+# Résumé du modèle
+print(summary(model))
+ 
+# Prédire sur les données de test
+predictions <- predict(model, newdata = test_data)
+ 
+# Calculer la racine carrée de l'erreur quadratique moyenne (RMSE)
+rmse <- sqrt(mean((predictions - test_data$price)^2))
+print(paste("RMSE: ", rmse))
+ 
+# Visualiser les prédictions vs valeurs réelles
+ggplot() +
+  geom_point(aes(x = test_data$price, y = predictions)) +
+  geom_abline(slope = 1, intercept = 0, color = "red") +
+  labs(title = "Predicted vs Actual Prices", x = "Actual Prices", y = "Predicted Prices")
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
