@@ -6,6 +6,10 @@ library(RMySQL)
 library(ggplot2)
 library(DT)
 library(shinyWidgets)
+# library(keras)
+ 
+# Charger le modèle
+# model <- load_model_hdf5("house_price_prediction_model.h5")
 
 # Application du thème graphique
 custom_theme <- bs_theme(
@@ -57,7 +61,38 @@ ui <- shinyUI(
                       )
                     )
                   )
-)
+),
+      tabPanel("Prédiction",
+      mainPanel(
+          titlePanel("Prédiction"),
+            strong("Faites une prédiction de la valeur de votre bien !"),
+              sidebarLayout(
+    sidebarPanel(
+      # Valeurs d'entrées à transmettre
+      numericInput("bedrooms", "Bedrooms", value = 3, min = 1),
+      numericInput("bathrooms", "Bathrooms", value = 2, min = 1),
+      numericInput("sqft_living", "Square Feet Living", value = 2000, min = 1),
+      numericInput("sqft_lot", "Square Feet Lot", value = 5000, min = 1),
+      numericInput("floors", "Floors", value = 2, min = 1),
+      numericInput("waterfront", "Waterfront", value = 0, min = 0, max = 1),
+      numericInput("view", "View", value = 0, min = 0, max = 4),
+      numericInput("condition", "Condition", value = 3, min = 1, max = 5),
+      numericInput("grade", "Grade", value = 7, min = 1, max = 13),
+      numericInput("sqft_above", "Square Feet Above", value = 1500, min = 1),
+      numericInput("sqft_basement", "Square Feet Basement", value = 500, min = 0),
+      numericInput("yr_built", "Year Built", value = 1990, min = 1900),
+      numericInput("yr_renovated", "Year Renovated", value = 0, min = 0),
+      numericInput("zipcode", "Zipcode", value = 98001, min = 1),
+      numericInput("lat", "Latitude", value = 47.5112, min = -90, max = 90),
+      numericInput("long", "Longitude", value = -122.257, min = -180, max = 180),
+      numericInput("sqft_living15", "Square Feet Living 15", value = 1800, min = 1),
+      numericInput("sqft_lot15", "Square Feet Lot 15", value = 4000, min = 1),
+      actionButton("predict", "Prédire le prix")
+    ),
+    mainPanel(
+      textOutput("price")
+    ))
+        )),
   )
 )
 
@@ -82,6 +117,19 @@ server <- function(input, output, session) {
     updateSelectInput(session, "filter_value", choices = names(df))
     updateSelectInput(session, "comparaison", choices = names(df))
   })
+
+  # observeEvent(input$predict, {
+  #   # Conversion des features en matrice
+  #   features <- matrix(as.numeric(input$sqft_living), nrow = 1)
+  #   # Prédiction
+  #   predicted_price <- predict(model, features)
+  #   # Affichage du prix prédit
+  #   output$price <- renderText({
+  #     sprintf("Prix prédit : $%0.2f", predicted_price)
+  #   })
+  # })
+
+
   # Lecture de la table
   df <- dbReadTable(con, 'data_cleaned')
   # df_filtered <- dbGetQuery(con, paste("SELECT * FROM data_cleaned WHERE ",input$filter_col,"=",input$filter_value))

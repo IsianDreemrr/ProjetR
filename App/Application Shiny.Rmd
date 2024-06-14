@@ -16,26 +16,13 @@ install.packages("DT")
 ```{r}
 install.packages("shinyWidgets")
 ```
-
 ```{r}
-#library(shiny)
-#runExample("01_hello")
-```
-```{r}
-#library(shiny)
-#library(bslib)
-
-```
-```{r}
-
-```
-
-
-```{r}
-
+install.packages("keras")
 ```
 
 ```{r}
+library(shiny)
+
 runApp("Projet_app")
 ```
 
