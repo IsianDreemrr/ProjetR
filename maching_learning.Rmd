@@ -1,0 +1,168 @@
+---
+title: "IA"
+output: html_notebook
+---
+#Connection à la base de données 
+ 
+```{r}
+# Charger le package RMySQL
+library(RMySQL)
+
+# Connexion à la base de données
+mydb <- dbConnect(MySQL(), 
+                  dbname = "ipssi_r",
+                  host = "mysql-ipssi.alwaysdata.net",
+                  port = 3306,
+                  user = "ipssi",  # Assurez-vous que le nom d'utilisateur est correct
+                  password = "Ipssi123?",  # Remplacez 'your_password' par votre mot de passe réel
+                  ssl.use = TRUE)  # Activer la connexion SSL
+
+
+data_cleaned <- dbReadTable(mydb, "data_cleaned")
+
+
+print(head(data_cleaned))
+
+
+dbDisconnect(mydb)
+
+```
+
+# Conversion en facteurs et vérification des niveaux
+```{r}
+
+data$bathrooms <- factor(data$bathrooms)
+data$floors <- factor(data$floors)
+data$waterfront <- factor(data$waterfront)
+data$view <- factor(data$view)
+data$condition <- factor(data$condition)
+data$renovated <- factor(data$renovated)
+
+
+summary(data$bathrooms)
+summary(data$floors)
+summary(data$waterfront)
+summary(data$view)
+summary(data$condition)
+summary(data$renovated)
+
+```
+
+
+
+
+
+## Maching Learning
+
+
+## Vérifier la corrélation
+
+```{r}
+
+cor_data <- train_set %>% select(sqft_living, sqft_above, sqft_basement)
+cor(cor_data, use = "complete.obs")
+
+```
+
+```{r}
+data <- data_cleaned
+print(data)
+```
+
+#Séparer les données en ensembles d'entraînement et de test
+
+```{r}
+library(caret)
+
+set.seed(123) 
+trainIndex <- createDataPartition(data$price, p = 0.8, list = FALSE)
+trainData <- data[trainIndex,]
+testData <- data[-trainIndex,]
+
+
+features <- c("bedrooms", "bathrooms", "sqft_living", "sqft_lot", "floors", 
+              "waterfront", "view", "condition", "grade", "sqft_above", 
+              "sqft_basement", "yr_built", "yr_renovated", "zipcode", 
+              "lat", "long", "sqft_living15")
+```
+
+
+
+```{r}
+# Assurez-vous que les variables sont correctement converties et non factorielles si elles ne doivent pas l'être
+str(trainData)
+
+
+```
+
+# Random Forest
+
+
+```{r}
+# Charger les packages nécessaires
+library(caret)
+library(randomForest)
+library(lubridate)
+
+# Votre dataframe est déjà chargé dans `data`
+
+# Conversion de la colonne `date` en format Date
+data$date <- as.Date(data$date)
+
+# Prétraitement des données
+# Remplacer les `0` par NA dans `yr_renovated`
+data$yr_renovated <- ifelse(data$yr_renovated == 0, NA, data$yr_renovated)
+
+# Convertir les colonnes factor en numériques si nécessaire pour le modèle
+data$waterfront <- as.numeric(as.character(data$waterfront))
+data$view <- as.numeric(as.character(data$view))
+data$condition <- as.numeric(as.character(data$condition))
+data$grade <- as.numeric(as.character(data$grade))
+
+# Supprimer les colonnes inutiles pour la prédiction
+data <- data[, !(names(data) %in% c("date"))]
+
+# Remplacer les NA par des valeurs adaptées (par exemple, la médiane pour les variables numériques)
+preprocess <- preProcess(data, method = c("medianImpute"))
+data <- predict(preprocess, newdata = data)
+
+# Vérifier la structure des données
+str(data)
+
+# Division des données en jeux d'entraînement et de test
+set.seed(123)
+trainIndex <- createDataPartition(data$price, p = 0.8, list = FALSE)
+trainData <- data[trainIndex, ]
+testData <- data[-trainIndex, ]
+
+# Utiliser un sous-échantillon de 10% pour les tests
+set.seed(123)
+sample_indices <- sample(seq_len(nrow(trainData)), size = 0.1 * nrow(trainData))
+trainData_sample <- trainData[sample_indices, ]
+
+# Entraîner le modèle de Forêt Aléatoire avec moins d'arbres pour tester
+model_rf <- randomForest(
+  price ~ ., 
+  data = trainData_sample, 
+  ntree = 100,  
+  mtry = floor(sqrt(ncol(trainData_sample) - 1)),  
+  maxnodes = 30,  
+  importance = TRUE  
+)
+
+print(model_rf)
+
+# Faire des prédictions sur le jeu de test
+predictions <- predict(model_rf, newdata = testData)
+
+# Évaluer le modèle
+evaluation <- postResample(pred = predictions, obs = testData$price)
+print(evaluation)
+
+
+cat("RMSE: ", evaluation["RMSE"], "\n")
+cat("R-squared: ", evaluation["Rsquared"], "\n")
+cat("MAE: ", evaluation["MAE"], "\n")
+
+```
+
